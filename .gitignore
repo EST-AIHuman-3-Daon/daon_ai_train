@@ -148,3 +148,14 @@ history.txt
 *.gguf
 
 src/unsloth_compiled_cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Unsloth
+unsloth_compiled_cache/
+src/unsloth_compiled_cache/
+
+# Optuna
+experiments/optuna.db
