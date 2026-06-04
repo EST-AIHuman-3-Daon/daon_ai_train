@@ -130,7 +130,7 @@ data/splits/*
 # Unsloth / LoRA
 # =========================
 unsloth_compiled_cache/
-adapters/
+adapters/*
 *_checkpoints/
 checkpoint-*/
 embeddings_cache.pkl
@@ -159,3 +159,7 @@ src/unsloth_compiled_cache/
 
 # Optuna
 experiments/optuna.db
+
+experiments/
+
+friendly_model_gguf/

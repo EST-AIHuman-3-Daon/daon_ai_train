@@ -15,11 +15,15 @@ from unsloth import FastLanguageModel
 import warnings
 
 warnings.filterwarnings("ignore")
+
 # ───────────────────────────────────────────
 # 0. 경로 설정
 # ───────────────────────────────────────────
+
+MODEL_VERSION = "Qwen2.5-7B-Instruct"
+
 BASE_DIR    = Path(__file__).resolve().parent.parent
-ADAPTER_DIR = BASE_DIR / "adapters"
+ADAPTER_DIR = BASE_DIR / "adapters" / MODEL_VERSION
 
 MAX_SEQ_LENGTH = 2048
 
@@ -32,6 +36,8 @@ INFERENCE_PROMPTS = {
 - 마지막 문장은 질문형으로 끝내세요.
 - 무례한 인신공격, 비하, 차별 표현은 사용하지 마세요.
 - 예시 문장을 그대로 복사하지 말고 입력 답변에 맞게 표현을 바꾸세요.
+- 지원자가 답변을 더 이상 이어가기 어렵다고 하거나, 주제 전환을 요청하면 존중하고 다음 질문으로 넘어가세요.
+- "지원자가 구체적인 실무 사례가 없다고 답변했습니다. 이 경우, 무리하게 사례를 요구하지 말고 '그 기술을 어떻게 학습하고 있는지', '관련하여 어떤 기술적 호기심을 가지고 공부하고 있는지' 학습 태도나 기초 역량을 검증하는 방향으로 전환하여 질문하세요."
 
 [압박 면접관 규칙]
 당신은 대기업 실무 압박 면접관입니다.
@@ -171,6 +177,7 @@ def build_new_question_prompt(
 새로운 평가 항목의 질문이어야 합니다.
 
 인사말 없이 질문만 출력하세요.
+
 """
 
     return (
@@ -179,18 +186,6 @@ def build_new_question_prompt(
         f"<|im_start|>assistant\n"
     )
 
-def create_session(persona: str, job_role: str, max_turn: int = 10) -> dict:
-    return {
-        "persona": persona,
-        "job_role": job_role,
-        "max_turn": max_turn,
-        "turn": 0,
-        "status": "idle",
-        "history": [],
-        "last_question": None,
-        "phase": "new_question",
-        "followup_count": 0, # 추가: 꼬리질문 횟수 추적
-    }
 
 # ───────────────────────────────────────────
 # 5. 추론 함수
@@ -206,10 +201,10 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int = 200) -> str:
             temperature    = 0.7,
             top_p          = 0.9,
             do_sample      = True,
+            repetition_penalty = 1.1,
             pad_token_id   = tokenizer.eos_token_id,
         )
 
-    # 입력 프롬프트 제외하고 생성된 부분만 디코딩
     generated = outputs[0][input_len:]
     response  = tokenizer.decode(generated, skip_special_tokens=True)
     return response.strip()
@@ -221,18 +216,15 @@ def create_session(persona: str, job_role: str, max_turn: int = 10) -> dict:
     return {
         "persona": persona,
         "job_role": job_role,
-
         "max_turn": max_turn,
         "turn": 0,
-
         "status": "idle",
-
         "history": [],
         "last_question": None,
-
-        # new_question -> followup -> new_question ...
         "phase": "new_question",
+        "followup_count": 0,
     }
+
 
 # ───────────────────────────────────────────
 # 7. 메인 대화 루프
@@ -241,14 +233,9 @@ def run_interview(persona: str = "pressure", job_role: str = "ICT"):
     model, tokenizer = load_model(persona)
     session = create_session(persona, job_role)
 
-    # [방어적 코드] 만약 세션에 키가 없으면 강제로 추가
-    if "followup_count" not in session:
-        session["followup_count"] = 0
-
     print("\n" + "="*55)
     print(f"  면접 시뮬레이터 | 페르소나: {persona} | 직무: {job_role}")
-    print(f"  '면접 시작' 입력 시 면접 시작")
-    print(f"  '면접 종료' 입력 시 종료")
+    print(f"  '면접 시작' 입력 시 면접 시작 | '면접 종료' 입력 시 종료")
     print("="*55 + "\n")
 
     while True:
@@ -261,15 +248,15 @@ def run_interview(persona: str = "pressure", job_role: str = "ICT"):
         if any(t in user_input for t in TRIGGER_END):
             print("\n[면접 종료]")
             print(f"총 {session['turn']}턴 진행됨")
-            break
+            return session
 
         # ── 시작 트리거 ──────────────────────────
         if any(t in user_input for t in TRIGGER_START):
             session["status"] = "active"
-            session["turn"]   = 0
+            session["turn"] = 0
 
             print("\n[면접관]: ", end="", flush=True)
-            prompt   = build_first_prompt(persona, job_role)
+            prompt = build_first_prompt(persona, job_role)
             response = generate(model, tokenizer, prompt)
             print(response)
 
@@ -279,7 +266,7 @@ def run_interview(persona: str = "pressure", job_role: str = "ICT"):
 
         # ── 면접 진행 중 ──────────────────────────
         if session["status"] == "active":
-
+            
             # 1. 답변 저장
             if session["history"] and session["history"][-1]["answer"] is None:
                 session["history"][-1]["answer"] = user_input
@@ -289,43 +276,29 @@ def run_interview(persona: str = "pressure", job_role: str = "ICT"):
             if session["turn"] >= session["max_turn"]:
                 session["status"] = "done"
                 print("\n[면접관]: 수고하셨습니다. 면접을 마치겠습니다.")
-                print(f"\n[총 {session['turn']}턴 진행 완료]")
-                break
+                return session
 
-            # 3. 질문 생성 로직 (꼬리질문 2회 제한)
-            if session["followup_count"] < 2:
-                # 꼬리질문 생성
-                prompt = build_prompt(
-                    persona=persona,
-                    job_role=job_role,
-                    question=session["last_question"],
-                    candidate_answer=user_input,
-                )
+            # 3. 질문 생성 로직
+            if "다음 질문" in user_input or "다른 질문" in user_input:
+                print("\n[면접관]: 알겠습니다. 다음 항목으로 넘어가겠습니다.")
+                prompt = build_new_question_prompt(persona, job_role, history_to_text(session["history"][-5:]))
+                session["followup_count"] = 0
+            
+            elif session["followup_count"] < 2:
+                prompt = build_prompt(persona, job_role, session["last_question"], user_input)
                 session["followup_count"] += 1
+            
             else:
-                # 새로운 질문 생성
-                prompt = build_new_question_prompt(
-                    persona=persona,
-                    job_role=job_role,
-                    history_text=history_to_text(session["history"][-5:])
-                )
-                session["followup_count"] = 0 # 카운트 초기화
+                prompt = build_new_question_prompt(persona, job_role, history_to_text(session["history"][-5:]))
+                session["followup_count"] = 0
 
-            # 4. 응답 생성 및 세션 업데이트
+            # 4. 응답 생성
             print("\n[면접관]: ", end="", flush=True)
-            response = generate(
-                model,
-                tokenizer,
-                prompt,
-            )
+            response = generate(model, tokenizer, prompt)
             print(response)
 
             session["last_question"] = response
-            session["history"].append({
-                "question": response,
-                "answer": None,
-            })
-
+            session["history"].append({"question": response, "answer": None})
 
         else:
             print("  '면접 시작'을 입력해주세요.")
@@ -336,16 +309,23 @@ def run_interview(persona: str = "pressure", job_role: str = "ICT"):
 # 8. 실행
 # ───────────────────────────────────────────
 if __name__ == "__main__":
-    # 페르소나 / 직무 설정
     PERSONA  = "pressure"   # "pressure" or "friendly"
     JOB_ROLE = "ICT"
 
-    session = run_interview(persona=PERSONA, job_role=JOB_ROLE)
+    try:
+        session = run_interview(persona=PERSONA, job_role=JOB_ROLE)
+    except Exception as e:
+        print(f"\n[오류 발생] 면접 중 예기치 못한 문제가 발생했습니다: {e}")
+        session = None
 
     # 대화 히스토리 출력
-    print("\n=== 대화 히스토리 ===")
-    for i, turn in enumerate(session["history"], 1):
-        print(f"\n[{i}턴]")
-        print(f"  면접관: {turn['question']}")
-        if turn["answer"]:
-            print(f"  지원자: {turn['answer']}")
+    if session and "history" in session:
+        print("\n=== 대화 히스토리 ===")
+        for i, turn in enumerate(session["history"], 1):
+            print(f"\n[{i}턴]")
+            print(f"  면접관: {turn['question']}")
+            if turn["answer"]:
+                print(f"  지원자: {turn['answer']}")
+    
+    else:
+        print("\n세션 정보가 없거나 면접이 정상적으로 초기화되지 않았습니다.")

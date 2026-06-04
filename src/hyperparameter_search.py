@@ -17,7 +17,8 @@ DATA_DIR = BASE_DIR / "data" / "processed"
 RESULT_DIR = BASE_DIR / "experiments"
 RESULT_DIR.mkdir(exist_ok=True)
 
-MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+# MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_NAME = "Qwen/Qwen3.5-9B"
 MAX_SEQ_LENGTH = 2048
 SAMPLE_SIZE = 200
 MAX_STEPS = 80 
@@ -69,7 +70,9 @@ torch.cuda.empty_cache()
 # 2. Optuna Objective
 # ───────────────────────────────────────────
 def objective(trial: optuna.Trial) -> float:
-    lr = trial.suggest_categorical("lr", [1e-4, 2e-4, 3e-4])
+    # lr = trial.suggest_categorical("lr", [1e-4, 2e-4, 3e-4])
+    # r  = trial.suggest_categorical("r",  [8, 16, 32])
+    lr = trial.suggest_categorical("lr", [1e-4, 2e-4])
     r  = trial.suggest_categorical("r",  [8, 16, 32])
 
     print(f"\n[Trial {trial.number}] lr={lr}, r={r}")
@@ -132,8 +135,18 @@ def objective(trial: optuna.Trial) -> float:
 # ───────────────────────────────────────────
 # 3. 실행
 # ───────────────────────────────────────────
+# ───────────────────────────────────────────
+# 3. 실행
+# ───────────────────────────────────────────
 if __name__ == "__main__":
-    sampler = optuna.samplers.GridSampler({"lr": [1e-4, 2e-4, 3e-4], "r": [8, 16, 32]})
+    # --- [Qwen2.5-7B 기존 설정] ---
+    # sampler = optuna.samplers.GridSampler({"lr": [1e-4, 2e-4, 3e-4], "r": [8, 16, 32]})
+    # study = optuna.create_study(direction="minimize", sampler=sampler)
+    # study.optimize(objective, n_trials=9)
+    
+    # --- [Qwen3.5-9B 신규 설정] ---
+    sampler = optuna.samplers.GridSampler({"lr": [1e-4, 2e-4], "r": [8, 16, 32]})
     study = optuna.create_study(direction="minimize", sampler=sampler)
-    study.optimize(objective, n_trials=9)
+    study.optimize(objective, n_trials=6)
+    
     study.trials_dataframe().to_csv(RESULT_DIR / "hyperparam_results.csv", index=False)
