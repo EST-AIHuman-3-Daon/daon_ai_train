@@ -125,3 +125,41 @@ data/splits/*
 !data/splits/.gitkeep
 ```
 
+
+# =========================
+# Unsloth / LoRA
+# =========================
+unsloth_compiled_cache/
+adapters/*
+*_checkpoints/
+checkpoint-*/
+embeddings_cache.pkl
+
+# =========================
+# Training Logs
+# =========================
+training.log
+nohup.out
+history.txt
+
+# =========================
+# GGUF
+# =========================
+*.gguf
+
+src/unsloth_compiled_cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Unsloth
+unsloth_compiled_cache/
+src/unsloth_compiled_cache/
+
+# Optuna
+experiments/optuna.db
+
+experiments/
+
+friendly_model_gguf/
