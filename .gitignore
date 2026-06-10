@@ -110,4 +110,18 @@ serviceAccountKey.json
 *.key
 *.crt
 secrets/
+
+
+# =============================
+# raw data / csv / json / jsonl
+# =============================
+
+data/raw/*
+data/processed/*
+data/splits/*
+
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/splits/.gitkeep
 ```
+

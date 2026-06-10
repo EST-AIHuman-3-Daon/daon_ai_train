@@ -1,0 +1,9 @@
+prompt,persona,mean_score,min_score,max_score,weak_rules
+A,pressure,70.76,42.86,85.71,"p4 2.0%, p7 34.0%"
+A,friendly,67.05,42.86,100.0,"f1 6.67%, f3 30.0%"
+B,pressure,74.09,42.86,100.0,"p4 9.3%, p1 44.0%"
+B,friendly,79.05,42.86,100.0,"f1 28.6%, f3 54.0%"
+C-1,pressure,88.85,71.43,100.0,"p1 26.6%, p6 95.3%"
+C-1,friendly,97.23,85.71,100.0,"f3 87.3%, f7 93.3%"
+C-2,pressure,96.93,80.00,100.0,"p1 84.6%"
+C-2,friendly,97.73,80.00,100.0,"f3 90.0%, f1 99.3%"
