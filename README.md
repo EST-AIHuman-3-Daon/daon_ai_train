@@ -100,7 +100,7 @@ daon_ai_train/
 python scripts/augment_persona.py
 ```
 
-GPT-4o-mini를 활용하여 ICT 직무 면접 질문에 대한 지원자 답변 및 페르소나별 꼬리질문을 비동기 병렬로 생성합니다.
+GPT-4o-mini를 활용하여 ICT 직무 면접 질문에 대한 지원자 답변 및 페르소나별 꼬리질문을 ThreadPoolExecutor 기반 병렬 처리로 생성합니다.
 Pressure / Friendly 페르소나 각각에 대해 vague, logical, experience_based 등 6가지 답변 유형을 생성합니다.
 
 ### 2. 데이터 분할
